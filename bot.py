@@ -8,6 +8,7 @@ from config import *
 
 bot = TeleBot(API_TOKEN)
 
+
 def gen_markup(id):
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
@@ -31,6 +32,33 @@ def get_my_score(message):
     collage = create_collage(image_paths)
 
     bot.send_photo(message.chat.id, collage, caption="Твои призы")
+
+
+@bot.message_handler(content_types=['photo'])
+def add_photo(message):
+    if message.chat.id not in ADMIN_IDS:
+        bot.reply_to(message, "У тебя нет прав для этой команды!")
+        return
+
+
+    if not message.caption or not message.caption.startswith("/addphoto"):
+        return 
+
+    photo_file = message.photo[-1] 
+    file_info = bot.get_file(photo_file.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+
+    img_name = file_info.file_path.split('/')[-1]
+    with open(f'{IMG_DIR}/{img_name}', 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+    manager.add_prize([(img_name,)])
+    hide_img(img_name)
+
+    bot.reply_to(message, f"Фото {img_name} успешно добавлено!")
+
+
+
 
     
     
@@ -72,8 +100,37 @@ def send_message():
             bot.send_photo(user, photo, reply_markup=gen_markup(id = prize_id))
         
 
+
+schedule_period = 1
+
+@bot.message_handler(commands=['setperiod'])
+def set_period(message):
+    global schedule_period
+    if message.chat.id not in ADMIN_IDS:
+        bot.reply_to(message, "У тебя нет прав для этой команды!")
+        return
+
+    try:
+        args = message.text.split()
+        if len(args) != 2:
+            raise ValueError
+
+        period_minutes = int(args[1])
+        if period_minutes <= 0:
+            raise ValueError
+
+        schedule_period = period_minutes
+        bot.reply_to(message, f"Период обновлён: {period_minutes} минут(ы)")
+
+        schedule.clear('send_task')
+        schedule.every(schedule_period).minute.do(send_message).tag('send_task')
+
+    except ValueError:
+        bot.reply_to(message, "Используй: /setperiod <количество минут>")
+
+
 def shedule_thread():
-    schedule.every().minute.do(send_message) # Здесь ты можешь задать периодичность отправки картинок
+    schedule.every(schedule_period).minute.do(send_message).tag('send_task')
     while True:
         schedule.run_pending()
         time.sleep(1)
