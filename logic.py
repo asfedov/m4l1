@@ -4,6 +4,11 @@ from config import DATABASE
 import os
 import cv2
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMG_DIR = os.path.join(BASE_DIR, 'img')
+HID_IMG_DIR = os.path.join(BASE_DIR, 'hidden_img')
+
 class DatabaseManager:
     def __init__(self, database):
         self.database = database
@@ -91,20 +96,43 @@ class DatabaseManager:
             cur = conn.cursor()
             cur.execute("SELECT prize_id, image FROM prizes WHERE used = 0 ORDER BY RANDOM() LIMIT 1")
             return cur.fetchall()[0]
+        
+    def get_winners_count(self, prize_id):
+        conn = sqlite3.connect(self.database)
+        with conn:
+            cur = conn.cursor()
+            cur.execute('SELECT COUNT(*) FROM winners WHERE prize_id = ?', (prize_id, ))
+            return cur.fetchall()[0][0]
+    
+   
+    
+    def get_rating(self):
+        conn = sqlite3.connect(self.database)
+        with conn:
+            cur = conn.cursor()
+            cur.execute('''
+                SELECT users.user_name, COUNT(winners.prize_id) AS prizes_count FROM users 
+                        INNER JOIN winners ON users.user_id = winners.user_id
+                        GROUP BY users.user_name
+                        ORDER BY prizes_count DESC
+                        LIMIT 10;
+                ''')
+            return cur.fetchall()
     
   
 def hide_img(img_name):
-    image = cv2.imread(f'img/{img_name}')
+    image = cv2.imread(f'{IMG_DIR}/{img_name}')
     blurred_image = cv2.GaussianBlur(image, (15, 15), 0)
     pixelated_image = cv2.resize(blurred_image, (30, 30), interpolation=cv2.INTER_NEAREST)
     pixelated_image = cv2.resize(pixelated_image, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
-    cv2.imwrite(f'hidden_img/{img_name}', pixelated_image)
+    cv2.imwrite(f'{HID_IMG_DIR}/{img_name}', pixelated_image)
 
 if __name__ == '__main__':
-    manager = DatabaseManager(DATABASE)
+    """manager = DatabaseManager(DATABASE)
     manager.create_tables()
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    IMG_DIR = os.path.join(BASE_DIR, 'img')
+
     prizes_img = os.listdir(IMG_DIR)
     data = [(x,) for x in prizes_img]
-    manager.add_prize(data)
+    manager.add_prize(data)"""
+    for img in os.listdir(IMG_DIR):
+        hide_img(img)
