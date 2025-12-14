@@ -17,11 +17,21 @@ def gen_markup(id):
 @bot.message_handler(commands=['rating'])
 def handle_rating(message):
     res = manager.get_rating() 
-    res = [f'| @{x[0]:<11} | {x[1]:<11}|\n{"_"*26}' for x in res]
+    res = [f'| {("Anonimous" if x[0] == None else f"@{x[0]}")  :<11} | {x[1]:<11}|\n{"_"*26}' for x in res]
     res = '\n'.join(res)
     res = f'|USER_NAME    |COUNT_PRIZE|\n{"_"*26}\n' + res
     bot.send_message(message.chat.id, res)
-    
+
+@bot.message_handler(commands=['myprizes'])
+def get_my_score(message):
+    info = manager.get_winners_img(message.chat.id)
+    prizes = [x[0] for x in info]
+    image_paths = os.listdir(IMG_DIR)
+    image_paths = [f'{IMG_DIR}/{x}' if x in prizes else f'{HID_IMG_DIR}/{x}' for x in image_paths]
+    collage = create_collage(image_paths)
+
+    bot.send_photo(message.chat.id, collage, caption="Твои призы")
+
     
     
 @bot.callback_query_handler(func=lambda call: True)
